@@ -40,16 +40,26 @@ void render(driver_state& state, render_type type) {
     if (type == render_type::triangle) {
 
         int j=0;
-        data_vertex holder;
+        int i=0;
+
 
         while(j<state.num_vertices){
             data_geometry trial;
-            holder.data=state.vertex_data+(j*state.floats_per_vertex);
-            state.vertex_shader(holder,trial,0);
+            data_vertex tryme;
+            tryme.data=state.vertex_data+(j*state.floats_per_vertex);
+            aye.push_back(tryme);
+            state.vertex_shader(aye.at(j),trial,state.uniform_data);
             all.push_back(trial);
             j++;
         }
-        for (int j = 0; j < 3; j++) {
+
+   /*     while(i<state.num_vertices){
+            data_geometry trial;
+            state.vertex_shader(aye.at(i),trial,state.uniform_data);
+            all.push_back(trial);
+            i++;
+        }*/
+        for (int j = 0; j < all.size(); j++) {
             if (j % 3 == 0) {
                 rasterize_triangle(state, all[j], all[j+1], all[j+2]);
             }
