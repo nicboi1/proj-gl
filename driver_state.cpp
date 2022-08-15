@@ -19,11 +19,14 @@ void initialize_render(driver_state& state, int width, int height)
     state.image_width=width;
     state.image_height=height;
     state.image_color=new pixel[width*height];
+    state.image_depth=new float[width*height];
     for(int i=0;i<width*height;i++){
         //state.image_color[i]= 0;
         state.image_color[i]= make_pixel(0,0,0);
+        state.image_depth[i]=std::numeric_limits<float>::max();
     }
-    state.image_depth=new float[width*height];
+
+
 }
 
 // This function will be called to render the data that has been stored in this class.
@@ -49,24 +52,70 @@ void render(driver_state& state, render_type type) {
             all.push_back(trial);
             j++;
         }
-        for (int j = 0; j < all.size(); j++) {
-            if (j % 3 == 0) {
-                rasterize_triangle(state, all[j], all[j+1], all[j+2]);
-            }
+        for (int j = 0; j <= all.size()-3; j+=3) {
+
+                rasterize_triangle(state, all.at(j),all.at(j+1), all.at(j+2));
+
         }
 
 
     }
 
 }
-
+/*data_geometry inters(data_geometry a,data_geometry b){
+    float m=(b.gl_Position[1]-a.gl_Position[1])/(b.gl_Position[0]-a.gl_Position[0]);
+    float yinter= a.gl_Position[1]-(m/a.gl_Position[0]);
+    if(a.gl_Position[0])
+}*/
 // This function clips a triangle (defined by the three vertices in the "in" array).
 // It will be called recursively, once for each clipping face (face=0, 1, ..., 5) to
 // clip against each of the clipping faces in turn.  When face=6, clip_triangle should
 // simply pass the call on to rasterize_triangle.
 void clip_triangle(driver_state& state, const data_geometry& v0,
     const data_geometry& v1, const data_geometry& v2,int face)
-{
+{/*
+    // all inside, one outside,two outside, all outside not in view, all outside in view
+    array<data_geometry> tresCoord[3];
+    tresCoord[0]==v0;
+    tresCoord[1]==v1;
+    tresCoord[2]==v2;
+    bool view[3];
+    bool xyView[3][2];
+   // int notView=0;
+    int fix;
+    for(int i=0;i<3;i++){
+        if((tresCoord[i].gl_Position[0]>=-1)&&(tresCoord[i].gl_Position[0]<=1) {
+            xyView[i][0] = true;
+        }else{
+            xyView[i][0]=false;
+        }
+        if((tresCoord[i].gl_Position[1]>=-1)&&(tresCoord[i].gl_Position[1]<=1){
+            xyView[i][1]=true;
+        }else{
+            xyView[i][1]=false;
+        }
+        if(xyView[i][0] && xyView[i][1]){
+            view[i]=true;
+        }else{
+            view[i]=false;
+            fix++;
+        }
+
+    }
+    if(fix==0){
+        //all inside
+        face=6;
+    }
+    else if(fix==1){
+        //one outside
+        while(view.size())
+    }
+    else if(fix==2){
+        //two outside
+    }
+    else if(fix=3){
+        //all outside
+    }*/
     if(face==6)
     {
         rasterize_triangle(state, v0, v1, v2);
@@ -81,14 +130,17 @@ void clip_triangle(driver_state& state, const data_geometry& v0,
 // fragments, calling the fragment shader, and z-buffering.
 void rasterize_triangle(driver_state& state, const data_geometry& v0,
     const data_geometry& v1, const data_geometry& v2) {
+    vec3 VT1(v0.gl_Position[0]/v0.gl_Position[3],v0.gl_Position[1]/v0.gl_Position[3],v0.gl_Position[2]/v0.gl_Position[3]);
+    vec3 VT2(v1.gl_Position[0]/v1.gl_Position[3],v1.gl_Position[1]/v1.gl_Position[3],v1.gl_Position[2]/v1.gl_Position[3]);
+    vec3 VT3(v2.gl_Position[0]/v2.gl_Position[3],v2.gl_Position[1]/v2.gl_Position[3],v2.gl_Position[2]/v2.gl_Position[3]);
 
-    float Ax=(state.image_width/2)+v0.gl_Position[0]*(state.image_width/2);
-    float Ay=(state.image_height/2)+v0.gl_Position[1]*(state.image_height/2);
-    float Bx=(state.image_width/2)+v1.gl_Position[0]*(state.image_width/2);
-    float By=(state.image_height/2)+v1.gl_Position[1]*(state.image_height/2);
-    float Cx=(state.image_width/2)+v2.gl_Position[0]*(state.image_width/2);
-    float Cy=(state.image_height/2)+v2.gl_Position[1]*(state.image_height/2);
-
+    float Ax=(state.image_width/2)+VT1[0]*(state.image_width/2);
+    float Ay=(state.image_height/2)+VT1[1]*(state.image_height/2);
+    float Bx=(state.image_width/2)+VT2[0]*(state.image_width/2);
+    float By=(state.image_height/2)+VT2[1]*(state.image_height/2);
+    float Cx=(state.image_width/2)+VT3[0]*(state.image_width/2);
+    float Cy=(state.image_height/2)+VT3[1]*(state.image_height/2);
+    //float zbuf=std::numeric_limits<max>;
 
     int minX = fmin(Cx, (fmin(Ax, Bx)));
     int maxX = fmax(Cx, (fmax(Ax, Bx)));
@@ -112,26 +164,20 @@ void rasterize_triangle(driver_state& state, const data_geometry& v0,
         beta=beta/total;
         gamma=gamma/total;
 
-        if((alpha>0) && (beta>0)  && (gamma>0) && (alpha+beta+gamma<=1)){
+        if((alpha>0) && (beta>0)  && (gamma>0) && (alpha+beta+gamma<=1+1e-4)){
+            data_fragment frag;
+            data_output outer;
             //inside triangle
-          /*  float c0[3]={Ax.data[3],v0.data[4],v0.data[5]};
-            float c1[3]={v1.data[3],v1.data[4],v1.data[5]};
-            float c2[3]={v2.data[3],v2.data[4],v2.data[5]};
+           // A=v B=xyz C=n
+            //float z=alpha*v0.gl_Position[2]+beta*v1.gl_Position[2]*gamma*v2.gl_Position[2];
 
-            vec3 c00={alpha*c0[0],beta*c0[1],gamma*c0[2]};
-            vec3 c01={alpha*c1[0],beta*c1[1],gamma*c1[2]};
-            vec3 c02={alpha*c2[0],beta*c2[1],gamma*c2[2]};
 
-            vec3 c00={alpha*c0[0],alpha*c0[1],alpha*c0[2]};
-            vec3 c01={beta*c1[0],beta*c1[1],beta*c1[2]};
-            vec3 c02={gamma*c2[0],gamma*c2[1],gamma*c2[2]};
 
-            float color[3];
-            color[0]=c00[0]+c01[0]+c02[0];
-            color[1]=c00[1]+c01[1]+c02[1];
-            color[2]=c00[2]+c01[2]+c02[2];
-            */
-            state.image_color[y*state.image_width+x]= make_pixel(255,255,255);
+
+                state.fragment_shader(frag,outer,state.uniform_data);
+                state.image_color[y*state.image_width+x]= make_pixel( (outer.output_color[0])*255, (outer.output_color[1])*255, (outer.output_color[2])*255);
+
+
             }
         }
     }
