@@ -38,24 +38,24 @@ void initialize_render(driver_state& state, int width, int height)
 //   render_type::strip -    The vertices are to be interpreted as a triangle strip.
 void render(driver_state& state, render_type type) {
 
-    std::vector <data_geometry> all;
-    std::vector <data_vertex> aye;
+    std::vector<data_vertex> dv;
+    std::vector<data_geometry> dg;
     if (type == render_type::triangle) {
-
-        int j=0;
-        while(j<state.num_vertices){
-            data_geometry trial;
-            data_vertex tryme;
-            tryme.data=state.vertex_data+(j*state.floats_per_vertex);
-            aye.push_back(tryme);
-            state.vertex_shader(aye.at(j),trial,state.uniform_data);
-            all.push_back(trial);
-            j++;
+        int i=0;
+        while ( i < state.num_vertices) {
+            data_vertex holder;
+            data_geometry holder2;
+            holder.data = state.vertex_data + (i * state.floats_per_vertex);
+            dv.push_back(holder);
+            holder2.data = dv.at(i).data;
+            state.vertex_shader(dv.at(i), holder2, state.uniform_data);
+            dg.push_back(holder2);
+            i++;
         }
-        for (int j = 0; j <= all.size()-3; j+=3) {
-
-                rasterize_triangle(state, all.at(j),all.at(j+1), all.at(j+2));
-
+        int j=0;
+        while(j <=dg.size()-3) {
+                rasterize_triangle(state, dg.at(j),dg.at(j+1), dg.at(j+2));
+                j+=3;
         }
 
 
@@ -130,60 +130,79 @@ void clip_triangle(driver_state& state, const data_geometry& v0,
 // fragments, calling the fragment shader, and z-buffering.
 void rasterize_triangle(driver_state& state, const data_geometry& v0,
     const data_geometry& v1, const data_geometry& v2) {
-    vec3 VT1(v0.gl_Position[0]/v0.gl_Position[3],v0.gl_Position[1]/v0.gl_Position[3],v0.gl_Position[2]/v0.gl_Position[3]);
-    vec3 VT2(v1.gl_Position[0]/v1.gl_Position[3],v1.gl_Position[1]/v1.gl_Position[3],v1.gl_Position[2]/v1.gl_Position[3]);
-    vec3 VT3(v2.gl_Position[0]/v2.gl_Position[3],v2.gl_Position[1]/v2.gl_Position[3],v2.gl_Position[2]/v2.gl_Position[3]);
+    //std::cout<<"here"<<std::endl;
+    vec2 XY1(v0.gl_Position[0]/v0.gl_Position[3],v0.gl_Position[1]/v0.gl_Position[3]);
+    vec2 XY2(v1.gl_Position[0]/v1.gl_Position[3],v1.gl_Position[1]/v1.gl_Position[3]);
+    vec2 XY3(v2.gl_Position[0]/v2.gl_Position[3],v2.gl_Position[1]/v2.gl_Position[3]);
 
-    float Ax=(state.image_width/2)+VT1[0]*(state.image_width/2);
-    float Ay=(state.image_height/2)+VT1[1]*(state.image_height/2);
-    float Bx=(state.image_width/2)+VT2[0]*(state.image_width/2);
-    float By=(state.image_height/2)+VT2[1]*(state.image_height/2);
-    float Cx=(state.image_width/2)+VT3[0]*(state.image_width/2);
-    float Cy=(state.image_height/2)+VT3[1]*(state.image_height/2);
-    //float zbuf=std::numeric_limits<max>;
+//each xy after
+    vec3 A=vec3(state.image_width/2+XY1[0]*state.image_width/2,state.image_height/2+XY1[1]*state.image_height/2,0.0);
+    vec3 B=vec3(state.image_width/2+XY2[0]*state.image_width/2,state.image_height/2+XY2[1]*state.image_height/2,0.0);
+    vec3 C=vec3(state.image_width/2+XY3[0]*state.image_width/2,state.image_height/2+XY3[1]*state.image_height/2,0.0);
+//box
+    int minX = fmin(C[0], (fmin(A[0], B[0])));
+    int maxX = fmax(C[0], (fmax(A[0], B[0])));
+    int minY = fmin(C[1], (fmin(A[1], B[1])));
+    int maxY = fmax(C[1], (fmax(A[1], B[1])));
 
-    int minX = fmin(Cx, (fmin(Ax, Bx)));
-    int maxX = fmax(Cx, (fmax(Ax, Bx)));
-    int minY = fmin(Cy, (fmin(Ay, By)));
-    int maxY = fmax(Cy, (fmax(Ay, By)));
+    vec3 Z(v0.gl_Position[2]/v0.gl_Position[3],v1.gl_Position[2]/v1.gl_Position[3],v2.gl_Position[2]/v2.gl_Position[3]);
 
+    for (int x = minX; x < maxX; x++) {
+        for (int y = minY; y < maxY; y++) {
+          // std:: cout<<"here1"<<std::endl;
+            vec3 spot=vec3(x,y,0.0);
+            //baryc
+            //z not the mag
+            double total=.5*(cross(B-A,B-C)[2]);
+            double alpha=.5*(cross(B-spot,B-C)[2]);
+            double beta=.5*(cross(spot-A,spot-C)[2]);
+            double gamma=.5*(cross(B-A,B-spot)[2]);
 
+            alpha=alpha/total;
+            beta=beta/total;
+            gamma=gamma/total;
 
-    for (int x = minX; x <= maxX; x++) {
-        for (int y = minY; y <= maxY; y++) {
+            double compare=alpha*Z[0]+beta*Z[1]+gamma*Z[2];
 
-        //v0=a v1=b v2=c ij=p
+            if((alpha>=0) && (beta>=0) && (gamma>=0)){
+                data_fragment frag;
+                frag.data=new float[MAX_FLOATS_PER_VERTEX];
+                data_output outer;
 
+              for (int k = 0; k < state.floats_per_vertex; k++) {
+                  //std:: cout<<"here2"<<std::endl;
 
-     float total= (Ax*By+Bx*Cy+Cx*Ay-Ay*Bx-By*Cx-Cy*Ax)/2;
-     float alpha= (x*By+Bx*Cy+Cx*y-y*Bx-By*Cx-Cy*x)/2;
-     float beta= (Ax*y+x*Cy+Cx*Ay-Ay*x-y*Cx-Cy*Ax)/2;
-     float gamma= (Ax*By+Bx*y+x*Ay-Ay*Bx-By*x-y*Ax)/2;
+                  interp_type itype=state.interp_rules[k];
+                  if(itype==interp_type::flat) {
+                    //  std::cout<<"flat ";
+                      frag.data[k] = v0.data[k];
+                  }
+                  else if(itype==interp_type::noperspective){
+                    //  std::cout<<"no";
+                      frag.data[k] = v0.data[k] * alpha + v1.data[k] * beta + v2.data[k] * gamma;
+                      }
+                  else if(itype==interp_type::smooth){
 
-        alpha=alpha/total;
-        beta=beta/total;
-        gamma=gamma/total;
+                  }
+              }
+              //  std::cout<<std::endl;
 
-        if((alpha>0) && (beta>0)  && (gamma>0) && (alpha+beta+gamma<=1+1e-4)){
-            data_fragment frag;
-            data_output outer;
-            //inside triangle
-           // A=v B=xyz C=n
-            //float z=alpha*v0.gl_Position[2]+beta*v1.gl_Position[2]*gamma*v2.gl_Position[2];
+              state.fragment_shader(frag, outer, state.uniform_data);
 
+              if(compare<(state.image_depth[y*state.image_width+x])) {
+                  state.image_depth[y*state.image_width+x]=compare;
+                   //std:: cout<<"here3"<<std::endl;
+                  state.image_color[y*state.image_width+x] = make_pixel((outer.output_color[0]) * 255,(outer.output_color[1]) * 255,(outer.output_color[2]) * 255);
+                }
+          }
 
-
-
-                state.fragment_shader(frag,outer,state.uniform_data);
-                state.image_color[y*state.image_width+x]= make_pixel( (outer.output_color[0])*255, (outer.output_color[1])*255, (outer.output_color[2])*255);
-
-
-            }
         }
-    }
-
-
 
     }
+}
+
+
+
+
 
 
