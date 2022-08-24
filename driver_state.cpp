@@ -53,13 +53,20 @@ void render(driver_state& state, render_type type) {
     }
     if (type == render_type::triangle) {
         int i = 0;
-        while(i <=dg.size()-3) {
-            clip_triangle(state, dg.at(i),dg.at(i+1), dg.at(i+2));
-            i+=3;
+        while(i <dg.size()/3) {
+            clip_triangle(state, dg.at(i*3),dg.at(i*3+1), dg.at(i*3+2));
+            i++;
         }
 
     }
-        if(type==render_type::fan){
+    else if(type==render_type::indexed){
+        int i=0;
+        while(i<state.num_triangles){
+            clip_triangle(state,dg.at(state.index_data[3*i]),dg.at(state.index_data[3*i+1]),dg.at(state.index_data[3*i+2]));
+            i++;
+        }
+    }
+        else if(type==render_type::fan){
             int i=0;
             while(i<dg.size()-2){
                 clip_triangle(state,dg.at(0),dg.at(i+1),dg.at(2+i));
@@ -67,20 +74,14 @@ void render(driver_state& state, render_type type) {
             }
 
         }
-        if(type==render_type::strip){
+       else if(type==render_type::strip){
             int i=0;
             while(i<dg.size()-2){
                 clip_triangle(state,dg.at(i),dg.at(i+1),dg.at(i+2));
                 i++;
             }
         }
-        if(type==render_type::indexed){
-            int i=0;
-            while(i<dg.size()){
-                clip_triangle(state,dg.at(state.index_data[3*1]),dg.at(state.index_data[3*1+1]),dg.at(state.index_data[3*1+2]));
-                i++;
-            }
-        }
+
 
 
 
@@ -147,6 +148,7 @@ void clip_triangle(driver_state& state, const data_geometry& v0,
                     test2[0].data = new float[MAX_FLOATS_PER_VERTEX];
                     test2[1] = v1;
                     test2[2] = test1[0];
+
                     i=0;
                     while (i < state.floats_per_vertex) {
                         //std::cout<<"Seg4";
